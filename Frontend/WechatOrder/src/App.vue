@@ -1,95 +1,83 @@
-<template>
-  <van-nav-bar 
-    :title="title" 
-    :left-arrow="showBackButton" 
-    @click-left="goBack"
+﻿<template>
+  <van-nav-bar
     v-if="!hideNavBar"
+    :title="title"
+    :left-arrow="showBackButton"
+    @click-left="goBack"
   />
+
   <div class="app-container">
     <router-view />
   </div>
-  
+
   <van-tabbar v-model="activeTab" v-if="showTabBar" @change="onTabChange">
-    <van-tabbar-item name="home" icon="home-o">首页</van-tabbar-item>
-    <van-tabbar-item name="menu" icon="orders-o">菜单</van-tabbar-item>
-    <van-tabbar-item name="cart" icon="cart-o" :badge="cartCount > 0 ? cartCount : undefined">购物车</van-tabbar-item>
-    <van-tabbar-item name="profile" icon="user-o">我的</van-tabbar-item>
+    <van-tabbar-item name="home" icon="home-o">工作台</van-tabbar-item>
+    <van-tabbar-item name="menu" icon="orders-o">点菜</van-tabbar-item>
+    <van-tabbar-item name="cart" icon="cart-o" :badge="cartStore.totalCount || undefined">暂存单</van-tabbar-item>
+    <van-tabbar-item name="profile" icon="setting-o">设置</van-tabbar-item>
   </van-tabbar>
 </template>
 
 <script>
-import { ref, computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useCartStore } from '@/stores/cart'
 
 export default {
   name: 'App',
   setup() {
     const route = useRoute()
     const router = useRouter()
+    const cartStore = useCartStore()
     const activeTab = ref('home')
-    
-    // 从 Pinia 获取购物车状态（这里暂时用模拟数据）
-    const cartItems = ref([
-      { id: 1, name: '宫保鸡丁', price: 28.00, quantity: 1 },
-      { id: 2, name: '白米饭', price: 2.00, quantity: 2 }
-    ])
-    
+
     const title = computed(() => {
       const titles = {
-        '/': '餐厅首页',
-        '/menu': '菜品列表',
-        '/cart': '购物车',
-        '/profile': '个人中心',
-        '/order': '提交订单',
-        '/order-history': '订单历史'
+        '/login': '系统登录',
+        '/': '老板点单台',
+        '/menu': '代客选菜',
+        '/cart': '暂存单',
+        '/profile': '门店设置',
+        '/order': '确认下单',
+        '/order-history': '订单记录'
       }
-      return titles[route.path] || '餐饮系统'
+      return titles[route.path] || '老板点单台'
     })
-    
-    const hideNavBar = computed(() => {
-      return route.path === '/login' || route.path === '/register'
-    })
-    
-    const showBackButton = computed(() => {
-      return !['/', '/menu', '/cart', '/profile'].includes(route.path) && !hideNavBar.value
-    })
-    
-    const showTabBar = computed(() => {
-      return ['/', '/menu', '/cart', '/profile'].includes(route.path) && !hideNavBar.value
-    })
-    
-    const cartCount = computed(() => {
-      return cartItems.value.reduce((sum, item) => sum + item.quantity, 0)
-    })
-    
-    const goBack = () => {
-      router.go(-1)
-    }
-    
+
+    const hideNavBar = computed(() => route.path === '/login')
+    const showBackButton = computed(() => !['/', '/menu', '/cart', '/profile'].includes(route.path) && !hideNavBar.value)
+    const showTabBar = computed(() => ['/', '/menu', '/cart', '/profile'].includes(route.path))
+
+    const goBack = () => router.back()
+
     const onTabChange = (name) => {
-      const tabRoutes = {
+      const routeMap = {
         home: '/',
         menu: '/menu',
         cart: '/cart',
         profile: '/profile'
       }
-      router.push(tabRoutes[name])
+      router.push(routeMap[name])
     }
-    
-    watch(route, (newRoute) => {
-      if (newRoute.path === '/') activeTab.value = 'home'
-      else if (newRoute.path === '/menu') activeTab.value = 'menu'
-      else if (newRoute.path === '/cart') activeTab.value = 'cart'
-      else if (newRoute.path === '/profile') activeTab.value = 'profile'
-    }, { immediate: true })
-    
+
+    watch(
+      () => route.path,
+      (path) => {
+        if (path === '/') activeTab.value = 'home'
+        if (path === '/menu') activeTab.value = 'menu'
+        if (path === '/cart') activeTab.value = 'cart'
+        if (path === '/profile') activeTab.value = 'profile'
+      },
+      { immediate: true }
+    )
+
     return {
       activeTab,
+      cartStore,
       title,
       hideNavBar,
       showBackButton,
       showTabBar,
-      cartCount,
       goBack,
       onTabChange
     }
@@ -98,70 +86,62 @@ export default {
 </script>
 
 <style>
+:root {
+  --mc-warm-bg: #fff8ef;
+  --mc-panel-bg: #fffdf8;
+  --mc-brand: #c45a1f;
+  --mc-brand-soft: #ffe5cf;
+  --mc-border: #f2dcc8;
+  --mc-text: #4e2d1a;
+}
+
 #app {
-  font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color: #2b2d42;
-  padding-bottom: 50px;
-  background: linear-gradient(135deg, #f6f9fc 0%, #e9ecef 100%);
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
   min-height: 100vh;
+  background: radial-gradient(circle at 0 0, #fff3e6 0%, var(--mc-warm-bg) 46%, #fffaf3 100%);
+  color: var(--mc-text);
 }
 
 .app-container {
   min-height: calc(100vh - 46px);
-  background: transparent;
 }
 
 .van-nav-bar {
-  background: linear-gradient(90deg, #4361ee, #3f37c9);
-  color: white;
-  border: none;
-  box-shadow: 0 4px 15px rgba(67, 97, 238, 0.3);
+  background: linear-gradient(90deg, #b34d16 0%, var(--mc-brand) 45%, #d87835 100%) !important;
 }
 
-.van-nav-bar__title {
-  color: white;
-  font-weight: 600;
-  font-size: 18px;
-  letter-spacing: 0.5px;
-}
-
+.van-nav-bar__title,
 .van-nav-bar__arrow {
-  color: white;
-  font-size: 20px;
+  color: #fff !important;
 }
 
 .van-tabbar {
-  background: linear-gradient(90deg, #4361ee, #3f37c9);
-  border-top: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 -4px 15px rgba(67, 97, 238, 0.2);
+  background: #fffaf5 !important;
+  border-top: 1px solid var(--mc-border) !important;
 }
 
 .van-tabbar-item {
-  color: rgba(255, 255, 255, 0.85);
-  background: transparent;
+  color: #9a6c4a !important;
 }
 
 .van-tabbar-item--active {
-  color: white;
+  color: var(--mc-brand) !important;
   font-weight: 700;
-  transform: translateY(-2px);
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  padding: 5px 10px;
 }
 
-.van-tabbar-item__icon {
-  font-size: 22px;
+.van-button--primary {
+  background: linear-gradient(90deg, #bc4f19 0%, #d16d2f 100%) !important;
+  border: none !important;
 }
 
-/*底固定元素样式 */
-.fixed-bottom {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
+.van-button--warning {
+  background: linear-gradient(90deg, #d36a1f 0%, #e08b3f 100%) !important;
+  border: none !important;
+}
+
+.van-cell,
+.van-cell-group,
+.van-field {
+  background: var(--mc-panel-bg) !important;
 }
 </style>

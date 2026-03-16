@@ -1,4 +1,4 @@
-﻿import apiClient from './apiClient'
+import apiClient from './apiClient'
 
 export const getAllTables = async (skip = 0, limit = 100) => {
   const response = await apiClient.get('/tables', { params: { skip, limit } })
@@ -79,5 +79,29 @@ export const getTableDetails = async (tableId) => {
 
 export const batchUpdateTables = async (tableUpdates) => {
   const response = await apiClient.post('/tables/batch-update', tableUpdates)
+  return response.data
+}
+
+export const completeTableCleaning = async (tableId) => {
+  const response = await apiClient.post(`/tables/${tableId}/clean-complete`)
+  return response.data
+}
+export const getReservations = async (skip = 0, limit = 100, status = null) => {
+  const response = await apiClient.get('/reservations', { params: { skip, limit, status } })
+  return response.data
+}
+
+export const createReservation = async (reservationData) => {
+  const response = await apiClient.post('/reservations', reservationData)
+  return response.data
+}
+
+export const cancelReservation = async (reservationId) => {
+  const response = await apiClient.post(`/reservations/${reservationId}/cancel`)
+  return response.data
+}
+
+export const arriveReservation = async (reservationId) => {
+  const response = await apiClient.post(`/reservations/${reservationId}/arrive`)
   return response.data
 }

@@ -1,158 +1,144 @@
-<template>
+﻿<template>
   <div class="order-history">
-    <van-tabs v-model:active="activeTab" sticky>
-      <van-tab name="all" title="全部">
-        <van-list>
-          <van-cell 
-            v-for="order in orders" 
-            :key="order.id" 
-            :title="`订单号: ${order.id}`"
-            :label="`下单时间: ${order.date}`"
-            is-link
-            @click="viewOrder(order)"
-          >
-            <template #value>
-              <van-tag :type="getStatusType(order.status)">{{ order.status }}</van-tag>
-              <div class="order-price">¥{{ order.totalPrice }}</div>
-            </template>
-          </van-cell>
-        </van-list>
-      </van-tab>
-      <van-tab name="pending" title="待付款">
-        <van-empty description="暂无待付款订单" v-if="pendingOrders.length === 0" />
-        <van-list v-else>
-          <van-cell 
-            v-for="order in pendingOrders" 
-            :key="order.id" 
-            :title="`订单号: ${order.id}`"
-            :label="`下单时间: ${order.date}`"
-            is-link
-            @click="viewOrder(order)"
-          >
-            <template #value>
-              <van-tag :type="getStatusType(order.status)">{{ order.status }}</van-tag>
-              <div class="order-price">¥{{ order.totalPrice }}</div>
-            </template>
-          </van-cell>
-        </van-list>
-      </van-tab>
-      <van-tab name="completed" title="已完成">
-        <van-empty description="暂无已完成订单" v-if="completedOrders.length === 0" />
-        <van-list v-else>
-          <van-cell 
-            v-for="order in completedOrders" 
-            :key="order.id" 
-            :title="`订单号: ${order.id}`"
-            :label="`下单时间: ${order.date}`"
-            is-link
-            @click="viewOrder(order)"
-          >
-            <template #value>
-              <van-tag :type="getStatusType(order.status)">{{ order.status }}</van-tag>
-              <div class="order-price">¥{{ order.totalPrice }}</div>
-            </template>
-          </van-cell>
-        </van-list>
-      </van-tab>
-    </van-tabs>
+    <van-loading v-if="loading" class="loading" size="24px">加载中...</van-loading>
+    <van-empty v-else-if="orders.length === 0" description="暂无历史订单" />
+
+    <van-cell-group v-else class="panel">
+      <van-cell
+        v-for="order in orders"
+        :key="order.id"
+        :title="`订单 #${order.id}`"
+        :label="formatTime(order.created_at)"
+      >
+        <template #value>
+          <div class="value-block">
+            <van-tag :type="statusType(order.order_status)">{{ statusLabel(order.order_status) }}</van-tag>
+            <div class="amount">¥{{ Number(order.total_amount || 0).toFixed(2) }}</div>
+          </div>
+        </template>
+      </van-cell>
+    </van-cell-group>
   </div>
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { Toast } from 'vant'
+import { getOrder } from '@/services/orderService'
+import { ensureWechatAuth } from '@/services/authService'
+
+const ORDER_IDS_KEY = 'wechat_order_ids'
 
 export default {
   name: 'OrderHistory',
   setup() {
-    const activeTab = ref('all')
+    const loading = ref(false)
+    const orders = ref([])
+    const alive = ref(true)
 
-    const orders = ref([
-      { 
-        id: '#001', 
-        date: '2023-10-01 10:30', 
-        status: '已完成', 
-        totalPrice: 32.00,
-        items: [
-          { name: '宫保鸡丁', price: 28.00, quantity: 1 },
-          { name: '白米饭', price: 2.00, quantity: 2 }
-        ]
-      },
-      { 
-        id: '#002', 
-        date: '2023-10-01 11:15', 
-        status: '已完成', 
-        totalPrice: 56.00,
-        items: [
-          { name: '麻婆豆腐', price: 18.00, quantity: 1 },
-          { name: '红烧肉', price: 38.00, quantity: 1 }
-        ]
-      },
-      { 
-        id: '#003', 
-        date: '2023-10-02 12:20', 
-        status: '待付款', 
-        totalPrice: 38.00,
-        items: [
-          { name: '鱼香肉丝', price: 26.00, quantity: 1 },
-          { name: '酸辣汤', price: 12.00, quantity: 1 }
-        ]
-      },
-      { 
-        id: '#004', 
-        date: '2023-10-02 14:30', 
-        status: '制作中', 
-        totalPrice: 86.00,
-        items: [
-          { name: '红烧肉', price: 38.00, quantity: 2 },
-          { name: '可乐', price: 5.00, quantity: 2 }
-        ]
-      }
-    ])
+    const loadOrders = async () => {
+      loading.value = true
+      try {
+        await ensureWechatAuth()
+        const raw = localStorage.getItem(ORDER_IDS_KEY)
+        const ids = raw ? JSON.parse(raw) : []
+        if (!Array.isArray(ids) || ids.length === 0) {
+          if (alive.value) orders.value = []
+          return
+        }
 
-    const pendingOrders = computed(() => {
-      return orders.value.filter(order => order.status === '待付款')
-    })
+        const result = await Promise.all(
+          ids.map(async (id) => {
+            try {
+              return await getOrder(id)
+            } catch {
+              return null
+            }
+          })
+        )
 
-    const completedOrders = computed(() => {
-      return orders.value.filter(order => order.status === '已完成')
-    })
-
-    const getStatusType = (status) => {
-      switch(status) {
-        case '待付款':
-        case '制作中':
-          return 'warning'
-        case '已完成':
-          return 'success'
-        case '已取消':
-          return 'danger'
-        default:
-          return 'info'
+        if (alive.value) {
+          orders.value = result.filter(Boolean)
+        }
+      } catch (error) {
+        if (alive.value) {
+          Toast.fail(error?.response?.data?.detail || '加载订单失败')
+        }
+      } finally {
+        if (alive.value) {
+          loading.value = false
+        }
       }
     }
 
-    const viewOrder = (order) => {
-      Toast(`查看订单详情: ${order.id}`)
+    const statusLabel = (status) => {
+      const map = {
+        pending: '待处理',
+        confirmed: '已确认',
+        preparing: '制作中',
+        ready: '待上菜',
+        served: '已上菜',
+        completed: '已完成',
+        cancelled: '已取消'
+      }
+      return map[status] || status
     }
+
+    const statusType = (status) => {
+      if (status === 'completed') return 'success'
+      if (status === 'cancelled') return 'danger'
+      if (status === 'pending') return 'warning'
+      return 'primary'
+    }
+
+    const formatTime = (value) => (value ? String(value).replace('T', ' ').slice(0, 16) : '-')
+
+    onMounted(() => {
+      alive.value = true
+      loadOrders()
+    })
+
+    onUnmounted(() => {
+      alive.value = false
+      loading.value = false
+    })
 
     return {
-      activeTab,
+      loading,
       orders,
-      pendingOrders,
-      completedOrders,
-      getStatusType,
-      viewOrder
+      statusLabel,
+      statusType,
+      formatTime
     }
   }
 }
 </script>
 
 <style scoped>
-.order-price {
-  margin-top: 5px;
-  text-align: right;
-  font-weight: bold;
-  color: #ee0a24;
+.order-history {
+  padding: 12px;
+}
+
+.panel {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.loading {
+  display: block;
+  margin-top: 20px;
+  text-align: center;
+}
+
+.value-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.amount {
+  color: #c6511a;
+  font-weight: 700;
 }
 </style>

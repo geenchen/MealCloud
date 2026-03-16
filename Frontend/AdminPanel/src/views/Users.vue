@@ -1,258 +1,311 @@
-<template>
-  <div class="users">
+﻿<template>
+  <div class="users-page">
     <el-card>
       <template #header>
         <div class="card-header">
           <span>用户管理</span>
-          <el-button type="primary" @click="addUser">新增用户</el-button>
+          <el-button type="primary" @click="openAddDialog">新增用户</el-button>
         </div>
       </template>
-      
-      <el-table :data="users" style="width: 100%" stripe>
+
+      <el-table v-loading="loading" :data="users" stripe>
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="username" label="用户名" width="120" />
-        <el-table-column prop="email" label="邮箱" width="200" />
-        <el-table-column prop="fullName" label="姓名" width="120" />
-        <el-table-column prop="role" label="角色" width="100">
+        <el-table-column prop="username" label="账号" min-width="140" />
+        <el-table-column prop="email" label="邮箱" min-width="220" />
+        <el-table-column prop="full_name" label="姓名" width="140" />
+        <el-table-column label="角色" width="110">
           <template #default="scope">
-            <el-tag :type="getRoleType(scope.row.role)">
-              {{ scope.row.role }}
+            <el-tag :type="scope.row.is_admin ? 'warning' : 'info'">
+              {{ scope.row.is_admin ? '管理员' : '员工' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="isActive" label="状态" width="80">
+        <el-table-column label="状态" width="100">
           <template #default="scope">
-            <el-tag :type="scope.row.isActive ? 'success' : 'danger'">
-              {{ scope.row.isActive ? '启用' : '禁用' }}
+            <el-tag :type="scope.row.is_active ? 'success' : 'danger'">
+              {{ scope.row.is_active ? '启用' : '停用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="150" />
-        <el-table-column label="操作" width="200">
+        <el-table-column label="创建时间" width="180">
+          <template #default="scope">{{ formatDateTime(scope.row.created_at) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="290" fixed="right">
           <template #default="scope">
-            <el-button size="small" @click="editUser(scope.row)">编辑</el-button>
-            <el-button 
-              size="small" 
-              :type="scope.row.isActive ? 'warning' : 'success'" 
+            <el-button size="small" @click="openEditDialog(scope.row)">编辑</el-button>
+            <el-button size="small" type="warning" plain @click="openPasswordDialog(scope.row)">重置密码</el-button>
+            <el-button
+              size="small"
+              :type="scope.row.is_active ? 'danger' : 'success'"
+              plain
               @click="toggleUserStatus(scope.row)"
             >
-              {{ scope.row.isActive ? '禁用' : '启用' }}
+              {{ scope.row.is_active ? '禁用' : '启用' }}
             </el-button>
-            <el-button size="small" type="danger" @click="deleteUser(scope.row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
-      
+
       <el-pagination
+        :current-page="currentPage"
+        :page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        layout="total, sizes, prev, pager, next, jumper"
+        style="margin-top: 16px"
         @size-change="handleSizeChange"
         @current-change="handleCurrentChange"
-        :current-page="currentPage"
-        :page-sizes="[10, 20, 50, 100]"
-        :page-size="pageSize"
-        layout="total, sizes, prev, pager, next, jumper"
-        :total="total"
-        style="margin-top: 20px;"
       />
     </el-card>
-    
-    <!-- 用户编辑对话框 -->
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px">
-      <el-form :model="currentUser" :rules="rules" ref="userForm" label-width="100px">
-        <el-form-item label="用户名" prop="username">
-          <el-input 
-            v-model="currentUser.username" 
-            :disabled="dialogType === 'edit'"
-            placeholder="请输入用户名"
-          ></el-input>
+
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogType === 'add' ? '新增用户' : '编辑用户'"
+      width="520px"
+      :close-on-click-modal="false"
+    >
+      <el-form ref="userFormRef" :model="form" :rules="formRules" label-width="90px">
+        <el-form-item label="账号" prop="username">
+          <el-input v-model="form.username" :disabled="dialogType === 'edit'" />
         </el-form-item>
+
         <el-form-item label="邮箱" prop="email">
-          <el-input 
-            v-model="currentUser.email" 
-            placeholder="请输入邮箱"
-          ></el-input>
+          <el-input v-model="form.email" />
         </el-form-item>
-        <el-form-item label="姓名" prop="fullName">
-          <el-input 
-            v-model="currentUser.fullName" 
-            placeholder="请输入姓名"
-          ></el-input>
+
+        <el-form-item label="姓名" prop="full_name">
+          <el-input v-model="form.full_name" />
         </el-form-item>
-        <el-form-item label="角色" prop="role">
-          <el-select v-model="currentUser.role" placeholder="请选择角色" style="width: 100%;">
-            <el-option label="管理员" value="管理员"></el-option>
-            <el-option label="服务员" value="服务员"></el-option>
-            <el-option label="厨师" value="厨师"></el-option>
-            <el-option label="收银员" value="收银员"></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态" prop="isActive">
+
+        <el-form-item label="角色">
           <el-switch
-            v-model="currentUser.isActive"
+            v-model="form.is_admin"
             :active-value="true"
             :inactive-value="false"
-            inline-prompt
-            active-text="启用"
-            inactive-text="禁用"
+            active-text="管理员"
+            inactive-text="员工"
           />
         </el-form-item>
+
+        <el-form-item label="状态">
+          <el-switch
+            v-model="form.is_active"
+            :active-value="true"
+            :inactive-value="false"
+            active-text="启用"
+            inactive-text="停用"
+          />
+        </el-form-item>
+
         <el-form-item v-if="dialogType === 'add'" label="密码" prop="password">
-          <el-input 
-            v-model="currentUser.password" 
-            type="password"
-            show-password
-            placeholder="请输入密码"
-          ></el-input>
+          <el-input v-model="form.password" type="password" show-password />
         </el-form-item>
       </el-form>
+
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="saveUser">保存</el-button>
-        </span>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="saveUser">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="passwordDialogVisible"
+      title="重置密码"
+      width="420px"
+      :close-on-click-modal="false"
+    >
+      <el-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" label-width="90px">
+        <el-form-item label="用户">
+          <el-input :model-value="passwordTarget?.username || ''" disabled />
+        </el-form-item>
+        <el-form-item label="新密码" prop="password">
+          <el-input v-model="passwordForm.password" type="password" show-password />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="passwordDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingPassword" @click="submitPasswordReset">确认重置</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script>
+import { createUser, getUsers, resetUserPassword, updateUser } from '@/services/userService'
+
+const createDefaultForm = () => ({
+  id: null,
+  username: '',
+  email: '',
+  full_name: '',
+  is_admin: false,
+  is_active: true,
+  password: ''
+})
+
 export default {
   name: 'Users',
   data() {
     return {
-      users: [
-        { id: 1, username: 'admin', email: 'admin@example.com', fullName: '系统管理员', role: '管理员', isActive: true, createdAt: '2023-01-01' },
-        { id: 2, username: 'staff001', email: 'staff001@example.com', fullName: '张三', role: '服务员', isActive: true, createdAt: '2023-05-15' },
-        { id: 3, username: 'chef001', email: 'chef001@example.com', fullName: '李师傅', role: '厨师', isActive: true, createdAt: '2023-06-20' },
-        { id: 4, username: 'cashier001', email: 'cashier001@example.com', fullName: '王收银', role: '收银员', isActive: true, createdAt: '2023-07-10' },
-        { id: 5, username: 'staff002', email: 'staff002@example.com', fullName: '赵四', role: '服务员', isActive: false, createdAt: '2023-08-05' }
-      ],
+      loading: false,
+      saving: false,
+      savingPassword: false,
+      users: [],
       currentPage: 1,
       pageSize: 10,
-      total: 5,
+      total: 0,
       dialogVisible: false,
-      dialogType: 'add', // 'add' 或 'edit'
-      currentUser: {
-        id: null,
-        username: '',
-        email: '',
-        fullName: '',
-        role: '服务员',
-        isActive: true,
+      dialogType: 'add',
+      form: createDefaultForm(),
+      passwordDialogVisible: false,
+      passwordTarget: null,
+      passwordForm: {
         password: ''
       },
-      rules: {
+      formRules: {
         username: [
-          { required: true, message: '请输入用户名', trigger: 'blur' },
-          { min: 3, max: 15, message: '长度在 3 到 15 个字符', trigger: 'blur' }
+          { required: true, message: '请输入账号', trigger: 'blur' },
+          { min: 3, max: 32, message: '账号长度 3-32 位', trigger: 'blur' }
         ],
         email: [
-          { required: true, message: '请输入邮箱地址', trigger: 'blur' },
-          { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
-        ],
-        fullName: [
-          { required: true, message: '请输入姓名', trigger: 'blur' }
+          { required: true, message: '请输入邮箱', trigger: 'blur' },
+          { type: 'email', message: '邮箱格式不正确', trigger: 'blur' }
         ],
         password: [
-          { required: this.dialogType === 'add', message: '请输入密码', trigger: 'blur' },
-          { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+          { required: true, message: '请输入密码', trigger: 'blur' },
+          { min: 6, message: '密码至少 6 位', trigger: 'blur' }
+        ]
+      },
+      passwordRules: {
+        password: [
+          { required: true, message: '请输入新密码', trigger: 'blur' },
+          { min: 6, message: '密码至少 6 位', trigger: 'blur' }
         ]
       }
     }
   },
-  computed: {
-    dialogTitle() {
-      return this.dialogType === 'add' ? '新增用户' : '编辑用户'
-    }
+  async mounted() {
+    await this.loadUsers()
   },
   methods: {
-    addUser() {
+    formatDateTime(value) {
+      if (!value) return '-'
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) return '-'
+      return date.toLocaleString('zh-CN', { hour12: false })
+    },
+    async loadUsers() {
+      this.loading = true
+      try {
+        const skip = (this.currentPage - 1) * this.pageSize
+        const list = await getUsers(skip, this.pageSize)
+        this.users = Array.isArray(list) ? list : []
+        this.total = skip + this.users.length + (this.users.length === this.pageSize ? 1 : 0)
+      } catch (error) {
+        console.error('加载用户失败:', error)
+        this.$message.error(error?.response?.data?.detail || '加载用户失败')
+      } finally {
+        this.loading = false
+      }
+    },
+    openAddDialog() {
       this.dialogType = 'add'
-      this.currentUser = {
-        id: null,
-        username: '',
-        email: '',
-        fullName: '',
-        role: '服务员',
-        isActive: true,
+      this.form = createDefaultForm()
+      this.dialogVisible = true
+      this.$nextTick(() => this.$refs.userFormRef?.clearValidate())
+    },
+    openEditDialog(row) {
+      this.dialogType = 'edit'
+      this.form = {
+        id: row.id,
+        username: row.username,
+        email: row.email,
+        full_name: row.full_name || '',
+        is_admin: Boolean(row.is_admin),
+        is_active: Boolean(row.is_active),
         password: ''
       }
       this.dialogVisible = true
-      this.$nextTick(() => {
-        if (this.$refs.userForm) {
-          this.$refs.userForm.clearValidate()
-        }
-      })
+      this.$nextTick(() => this.$refs.userFormRef?.clearValidate())
     },
-    editUser(row) {
-      this.dialogType = 'edit'
-      this.currentUser = { ...row }
-      this.dialogVisible = true
-      this.$nextTick(() => {
-        if (this.$refs.userForm) {
-          this.$refs.userForm.clearValidate()
-        }
-      })
-    },
-    deleteUser(id) {
-      this.$confirm('确定要删除这个用户吗？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(() => {
-        this.users = this.users.filter(item => item.id !== id)
-        this.total = this.users.length
-        this.$message.success('删除成功！')
-      })
-    },
-    toggleUserStatus(user) {
-      user.isActive = !user.isActive
-      const action = user.isActive ? '启用' : '禁用'
-      this.$message.success(`${user.username} 已${action}`)
-    },
-    saveUser() {
-      this.$refs.userForm.validate((valid) => {
-        if (valid) {
-          if (this.dialogType === 'add') {
-            const newId = Math.max(...this.users.map(u => u.id), 0) + 1
-            const newUser = {
-              ...this.currentUser,
-              id: newId,
-              createdAt: new Date().toISOString().split('T')[0]
-            }
-            delete newUser.password // 实际应用中，这里应该加密密码并发送到后端
-            this.users.push(newUser)
-            this.total = this.users.length
-            this.$message.success('新增成功！')
-          } else {
-            const index = this.users.findIndex(item => item.id === this.currentUser.id)
-            if (index !== -1) {
-              // 保留原始密码字段（如果不是编辑状态则不会显示）
-              const updatedUser = { ...this.currentUser }
-              delete updatedUser.password
-              this.users.splice(index, 1, updatedUser)
-              this.$message.success('修改成功！')
-            }
-          }
-          this.dialogVisible = false
+    async saveUser() {
+      const valid = await this.$refs.userFormRef?.validate().catch(() => false)
+      if (!valid) return
+
+      this.saving = true
+      try {
+        if (this.dialogType === 'add') {
+          await createUser({
+            username: this.form.username,
+            email: this.form.email,
+            full_name: this.form.full_name || null,
+            is_admin: this.form.is_admin,
+            is_active: this.form.is_active,
+            password: this.form.password
+          })
+          this.$message.success('用户创建成功')
         } else {
-          this.$message.error('请填写正确的用户信息！')
+          await updateUser(this.form.id, {
+            email: this.form.email,
+            full_name: this.form.full_name || null,
+            is_admin: this.form.is_admin,
+            is_active: this.form.is_active
+          })
+          this.$message.success('用户更新成功')
         }
-      })
-    },
-    getRoleType(role) {
-      switch(role) {
-        case '管理员': return 'primary'
-        case '服务员': return 'success'
-        case '厨师': return 'warning'
-        case '收银员': return 'info'
-        default: return 'info'
+
+        this.dialogVisible = false
+        await this.loadUsers()
+      } catch (error) {
+        console.error('保存用户失败:', error)
+        this.$message.error(error?.response?.data?.detail || '保存用户失败')
+      } finally {
+        this.saving = false
       }
     },
-    handleSizeChange(val) {
-      this.pageSize = val
+    openPasswordDialog(row) {
+      this.passwordTarget = row
+      this.passwordForm.password = ''
+      this.passwordDialogVisible = true
+      this.$nextTick(() => this.$refs.passwordFormRef?.clearValidate())
     },
-    handleCurrentChange(val) {
-      this.currentPage = val
+    async submitPasswordReset() {
+      const valid = await this.$refs.passwordFormRef?.validate().catch(() => false)
+      if (!valid || !this.passwordTarget) return
+
+      this.savingPassword = true
+      try {
+        await resetUserPassword(this.passwordTarget.id, this.passwordForm.password)
+        this.$message.success('密码已重置')
+        this.passwordDialogVisible = false
+      } catch (error) {
+        console.error('重置密码失败:', error)
+        this.$message.error(error?.response?.data?.detail || '重置密码失败')
+      } finally {
+        this.savingPassword = false
+      }
+    },
+    async toggleUserStatus(row) {
+      try {
+        await updateUser(row.id, {
+          is_active: !row.is_active
+        })
+        this.$message.success(!row.is_active ? '用户已启用' : '用户已禁用')
+        await this.loadUsers()
+      } catch (error) {
+        console.error('更新用户状态失败:', error)
+        this.$message.error(error?.response?.data?.detail || '更新用户状态失败')
+      }
+    },
+    async handleSizeChange(size) {
+      this.pageSize = size
+      this.currentPage = 1
+      await this.loadUsers()
+    },
+    async handleCurrentChange(page) {
+      this.currentPage = page
+      await this.loadUsers()
     }
   }
 }
@@ -263,9 +316,5 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.dialog-footer {
-  text-align: right;
 }
 </style>

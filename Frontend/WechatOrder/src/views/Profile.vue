@@ -1,131 +1,84 @@
-<template>
+﻿<template>
   <div class="profile">
-    <!-- 用户信息卡片 -->
-    <van-cell-group>
-      <van-cell class="user-info-cell" :border="false">
-        <template #default>
-          <div class="user-info">
-            <van-image 
-              round 
-              width="60" 
-              height="60" 
-              src="https://img.yzcdn.cn/vant/cat.jpeg"
-              class="avatar"
-            />
-            <div class="user-details">
-              <h3 class="username">张三</h3>
-              <p class="phone">138****8888</p>
-            </div>
-          </div>
-        </template>
-      </van-cell>
-    </van-cell-group>
-
-    <!-- 功能列表 -->
-    <van-cell-group style="margin-top: 10px;">
-      <van-cell title="我的订单" icon="orders-o" is-link @click="goToOrderHistory" />
-      <van-cell title="优惠券" icon="coupon-o" is-link @click="goToCoupons" />
-      <van-cell title="地址管理" icon="location-o" is-link @click="goToAddress" />
-      <van-cell title="会员中心" icon="vip-card-o" is-link @click="goToVipCenter" />
-      <van-cell title="帮助与反馈" icon="service-o" is-link @click="goToHelp" />
-      <van-cell title="关于我们" icon="info-o" is-link @click="goToAbout" />
-    </van-cell-group>
-
-    <!-- 退出登录按钮 -->
-    <div class="logout-section">
-      <van-button 
-        type="danger" 
-        size="large" 
-        @click="logout"
-      >
-        退出登录
-      </van-button>
+    <div class="hero">
+      <h3>老板代客模式</h3>
+      <p>当前为门店本地部署，未对顾客开放</p>
     </div>
+
+    <van-cell-group class="panel">
+      <van-cell title="当前角色" value="老板/店员" />
+      <van-cell title="系统状态" value="已连接后台" />
+    </van-cell-group>
+
+    <van-cell-group class="panel mt10">
+      <van-cell title="订单记录" icon="orders-o" is-link @click="goOrderHistory" />
+      <van-cell title="清空暂存单" icon="delete-o" is-link @click="clearCart" />
+    </van-cell-group>
   </div>
 </template>
 
 <script>
-import { Toast } from 'vant'
+import { useRouter } from 'vue-router'
+import { showConfirmDialog, Toast } from 'vant'
+import { useCartStore } from '@/stores/cart'
 
 export default {
   name: 'Profile',
   setup() {
-    const goToOrderHistory = () => {
-      Toast('跳转到订单历史');
+    const router = useRouter()
+    const cartStore = useCartStore()
+
+    const goOrderHistory = () => {
+      router.push('/order-history')
     }
 
-    const goToCoupons = () => {
-      Toast('跳转到优惠券');
-    }
-
-    const goToAddress = () => {
-      Toast('跳转到地址管理');
-    }
-
-    const goToVipCenter = () => {
-      Toast('跳转到会员中心');
-    }
-
-    const goToHelp = () => {
-      Toast('跳转到帮助与反馈');
-    }
-
-    const goToAbout = () => {
-      Toast('跳转到关于我们');
-    }
-
-    const logout = () => {
-      Toast('已退出登录');
+    const clearCart = async () => {
+      try {
+        await showConfirmDialog({ title: '确认', message: '确定清空暂存单吗？' })
+        cartStore.clearCart()
+        Toast.success('已清空')
+      } catch {
+        // noop
+      }
     }
 
     return {
-      goToOrderHistory,
-      goToCoupons,
-      goToAddress,
-      goToVipCenter,
-      goToHelp,
-      goToAbout,
-      logout
+      goOrderHistory,
+      clearCart
     }
   }
 }
 </script>
 
 <style scoped>
-.user-info-cell {
-  padding: 20px 16px;
+.profile {
+  padding: 12px;
 }
 
-.user-info {
-  display: flex;
-  align-items: center;
-}
-
-.avatar {
-  margin-right: 15px;
-}
-
-.user-details {
-  flex: 1;
-}
-
-.username {
-  margin: 0 0 5px 0;
-  font-size: 18px;
-  font-weight: bold;
-}
-
-.phone {
-  margin: 0;
-  color: #969799;
-  font-size: 14px;
-}
-
-.logout-section {
-  margin: 20px 16px;
-}
-
-.van-cell-group {
+.hero {
+  padding: 14px;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #fff0de 0%, #ffe5cc 100%);
+  border: 1px solid #f7d6b4;
+  color: #7a431d;
   margin-bottom: 10px;
+}
+
+.hero h3 {
+  margin: 0;
+}
+
+.hero p {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.panel {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.mt10 {
+  margin-top: 10px;
 }
 </style>

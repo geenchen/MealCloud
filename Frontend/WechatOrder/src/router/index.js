@@ -1,7 +1,15 @@
-import { createRouter, createWebHistory } from 'vue-router'
+﻿import { createRouter, createWebHistory } from 'vue-router'
+import { hasAccessGranted } from '@/services/accessService'
+import { hasBackendCredentials } from '@/services/authService'
 import Home from '../views/Home.vue'
 
 const routes = [
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('../views/Login.vue'),
+    meta: { public: true }
+  },
   {
     path: '/',
     name: 'Home',
@@ -37,6 +45,21 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+router.beforeEach((to) => {
+  if (to.meta?.public) {
+    return true
+  }
+
+  if (!hasAccessGranted() || !hasBackendCredentials()) {
+    return {
+      path: '/login',
+      query: { redirect: to.fullPath }
+    }
+  }
+
+  return true
 })
 
 export default router

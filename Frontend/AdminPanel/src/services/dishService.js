@@ -25,7 +25,40 @@ export const deleteDish = async (dishId) => {
   return response.data
 }
 
+export const uploadDishImage = async (file) => {
+  const formData = new FormData()
+  formData.append('image', file)
+  const response = await apiClient.post('/dishes/upload-image', formData)
+  return response.data
+}
+
 export const getCategories = async (skip = 0, limit = 100) => {
   const response = await apiClient.get('/categories', { params: { skip, limit } })
   return response.data
 }
+
+export const getCategory = async (categoryId) => {
+  const response = await apiClient.get(`/categories/${categoryId}`)
+  return response.data
+}
+
+export const createCategory = async (categoryData) => {
+  const response = await apiClient.post('/categories', categoryData)
+  return response.data
+}
+
+export const updateCategory = async (categoryId, categoryData) => {
+  const response = await apiClient.put(`/categories/${categoryId}`, categoryData)
+  return response.data
+}
+
+export const deleteCategory = async (categoryId) => {
+  const response = await apiClient.delete(`/categories/${categoryId}`)
+  return response.data
+}
+
+export const getCategoriesPage = async (skip = 0, limit = 100) => {
+  const response = await apiClient.get('/categories/page', { params: { skip, limit } })
+  return response.data
+}
+

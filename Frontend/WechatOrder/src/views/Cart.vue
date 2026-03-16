@@ -1,136 +1,147 @@
-<template>
+﻿<template>
   <div class="cart">
-    <van-cell-group title="购物车">
-      <van-cell v-for="item in cartItems" :key="item.id" :border="false">
+    <van-empty v-if="cartStore.items.length === 0" description="暂存单为空，先去点菜" />
+
+    <van-cell-group v-else title="已选菜品" class="panel">
+      <van-cell v-for="item in cartStore.items" :key="item.id">
         <div class="cart-item">
+          <img :src="resolveImage(item.image)" class="item-image" @error="onImageError" />
           <div class="item-info">
             <h3>{{ item.name }}</h3>
-            <p class="item-price">¥{{ item.price }}</p>
+            <p>¥{{ Number(item.price).toFixed(2) }}</p>
           </div>
-          <div class="quantity-controls">
-            <van-stepper 
-              v-model="item.quantity" 
-              theme="round" 
-              button-size="22" 
-              disable-input
-              @change="(value) => updateQuantity(item, value)"
-            />
-          </div>
-          <p class="item-total">¥{{ (item.price * item.quantity).toFixed(2) }}</p>
+          <van-stepper
+            :model-value="item.quantity"
+            theme="round"
+            button-size="22"
+            disable-input
+            @change="(value) => onQuantityChange(item, value)"
+          />
+          <div class="item-total">¥{{ (Number(item.price) * Number(item.quantity)).toFixed(2) }}</div>
         </div>
       </van-cell>
     </van-cell-group>
 
-    <div class="cart-footer">
-      <div class="total-info">
-        <p>总计: <span class="total-price">¥{{ totalPrice.toFixed(2) }}</span></p>
-      </div>
-      <van-button 
-        type="primary" 
-        size="large" 
-        :disabled="cartItems.length === 0"
-        @click="proceedToCheckout"
-      >
-        去结算
-      </van-button>
+    <div class="footer" v-if="cartStore.items.length > 0">
+      <div class="price">合计 ¥{{ cartStore.totalAmount.toFixed(2) }}</div>
+      <van-button type="primary" @click="goOrder">确认下单</van-button>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, computed } from 'vue'
-import { Toast } from 'vant'
+import { useRouter } from 'vue-router'
+import { useCartStore } from '@/stores/cart'
+
+const FALLBACK_IMAGE = 'https://img.yzcdn.cn/vant/user-default.png'
+const STATIC_BASE = import.meta.env.VITE_FILE_BASE_URL || ''
 
 export default {
   name: 'Cart',
   setup() {
-    const cartItems = ref([
-      { id: 1, name: '宫保鸡丁', price: 28.00, quantity: 1 },
-      { id: 2, name: '白米饭', price: 2.00, quantity: 2 }
-    ])
+    const router = useRouter()
+    const cartStore = useCartStore()
 
-    const totalPrice = computed(() => {
-      return cartItems.value.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-    })
-
-    const updateQuantity = (item, value) => {
-      if (value === 0) {
-        // 如果数量变为0，则从购物车中移除该项目
-        const index = cartItems.value.indexOf(item)
-        if (index > -1) {
-          cartItems.value.splice(index, 1)
-        }
-      }
-      Toast(`已更新 ${item.name} 数量为 ${value}`)
+    const resolveImage = (url) => {
+      if (!url) return FALLBACK_IMAGE
+      if (/^https?:\/\//i.test(url)) return url
+      if (url.startsWith('/')) return STATIC_BASE ? `${STATIC_BASE}${url}` : url
+      return url
     }
 
-    const proceedToCheckout = () => {
-      Toast('跳转到结算页面')
+    const onImageError = (event) => {
+      event.target.src = FALLBACK_IMAGE
+    }
+
+    const onQuantityChange = (item, value) => {
+      cartStore.setDishQuantity(item, value)
+    }
+
+    const goOrder = () => {
+      router.push('/order')
     }
 
     return {
-      cartItems,
-      totalPrice,
-      updateQuantity,
-      proceedToCheckout
+      cartStore,
+      resolveImage,
+      onImageError,
+      onQuantityChange,
+      goOrder
     }
   }
 }
 </script>
 
 <style scoped>
+.cart {
+  padding: 12px;
+  padding-bottom: 84px;
+}
+
+.panel {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
 .cart-item {
   display: flex;
   align-items: center;
-  padding: 15px 0;
-  border-bottom: 1px solid #f5f5f5;
+  gap: 10px;
+}
+
+.item-image {
+  width: 54px;
+  height: 54px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #f5eee7;
+  flex-shrink: 0;
 }
 
 .item-info {
   flex: 1;
+  min-width: 0;
 }
 
 .item-info h3 {
-  margin: 0 0 5px 0;
-  font-size: 16px;
-  font-weight: normal;
+  margin: 0 0 4px;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.item-price {
-  color: #ee0a24;
-  font-weight: bold;
+.item-info p {
   margin: 0;
-}
-
-.quantity-controls {
-  margin: 0 15px;
+  color: #c6511a;
 }
 
 .item-total {
-  font-weight: bold;
-  color: #ee0a24;
-  min-width: 60px;
+  min-width: 76px;
   text-align: right;
+  font-weight: 600;
+  color: #c6511a;
 }
 
-.cart-footer {
+.footer {
   position: fixed;
-  bottom: 50px; /* 为底部导航栏留出空间 */
-  left: 0;
-  right: 0;
-  padding: 15px;
-  background: #fff;
-  box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+  left: 10px;
+  right: 10px;
+  bottom: 56px;
+  background: #fffaf5;
+  border: 1px solid #f3dfcd;
+  border-radius: 14px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  box-shadow: 0 8px 20px rgba(121, 62, 29, 0.12);
 }
 
-.total-info {
-  margin-bottom: 10px;
-  text-align: right;
-}
-
-.total-price {
+.price {
   font-size: 18px;
-  color: #ee0a24;
-  font-weight: bold;
+  font-weight: 700;
+  color: #c6511a;
 }
 </style>
